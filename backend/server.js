@@ -19,17 +19,19 @@ app.use(express.json());
 // Game state
 const rooms = new Map(); // roomId -> room data
 const players = new Map(); // socketId -> player data
+const userStats = new Map(); // playerName -> { totalPoints, gamesWon, gamesPlayed }
 
 // Room structure:
 // {
 //   id: string,
 //   name: string,
-//   players: Map(socketId -> { id, name, score, ready }),
+//   players: Map(socketId -> { id, name, score, ready, totalPoints }),
 //   spectators: Set(socketId),
 //   gameState: 'waiting' | 'ready' | 'playing' | 'finished',
 //   currentNumber: number,
 //   roundStartTime: timestamp,
-//   winner: null | playerId
+//   winner: null | playerId,
+//   messages: Array({ type: 'user'|'system'|'score', sender: string, text: string, timestamp: number })
 // }
 
 io.on('connection', (socket) => {
@@ -57,17 +59,32 @@ io.on('connection', (socket) => {
             gameState: 'waiting',
             currentNumber: null,
             roundStartTime: null,
-            winner: null
+            winner: null,
+            messages: []
         };
 
         rooms.set(roomId, room);
+
+        // Initialize user stats if needed
+        if (!userStats.has(playerName)) {
+            userStats.set(playerName, { totalPoints: 0, gamesWon: 0, gamesPlayed: 0 });
+        }
 
         // Add creator as player
         room.players.set(socket.id, {
             id: socket.id,
             name: playerName,
             score: 0,
-            ready: false
+            ready: false,
+            totalPoints: userStats.get(playerName).totalPoints
+        });
+
+        // System message
+        room.messages.push({
+            type: 'system',
+            sender: 'System',
+            text: `${playerName} created the room`,
+            timestamp: Date.now()
         });
 
         players.set(socket.id, { roomId, role: 'player' });
@@ -93,11 +110,25 @@ io.on('connection', (socket) => {
             return;
         }
 
+        // Initialize user stats if needed
+        if (!userStats.has(playerName)) {
+            userStats.set(playerName, { totalPoints: 0, gamesWon: 0, gamesPlayed: 0 });
+        }
+
         room.players.set(socket.id, {
             id: socket.id,
             name: playerName,
             score: 0,
-            ready: false
+            ready: false,
+            totalPoints: userStats.get(playerName).totalPoints
+        });
+
+        // System message
+        room.messages.push({
+            type: 'system',
+            sender: 'System',
+            text: `${playerName} joined the room`,
+            timestamp: Date.now()
         });
 
         players.set(socket.id, { roomId, role: 'player' });
@@ -174,16 +205,54 @@ io.on('connection', (socket) => {
         // Award point
         player.score++;
 
+        // Update user stats total points
+        const stats = userStats.get(player.name);
+        stats.totalPoints++;
+        player.totalPoints = stats.totalPoints;
+
+        // Score chat message
+        room.messages.push({
+            type: 'score',
+            sender: 'System',
+            text: `${player.name} scored! Round: ${player.score}/10, Total: ${stats.totalPoints} pts`,
+            timestamp: Date.now()
+        });
+
         io.to(room.id).emit('playerScored', {
             playerId: socket.id,
             playerName: player.name,
             score: player.score
         });
 
+        io.to(room.id).emit('chatMessage', room.messages[room.messages.length - 1]);
+
         // Check win condition
         if (player.score >= 10) {
             room.gameState = 'finished';
             room.winner = socket.id;
+
+            // Update user stats for win
+            stats.gamesWon++;
+            stats.gamesPlayed++;
+
+            // Winner chat message
+            room.messages.push({
+                type: 'system',
+                sender: 'System',
+                text: `🏆 ${player.name} wins! Career: ${stats.gamesWon}W-${stats.gamesPlayed - stats.gamesWon}L, ${stats.totalPoints} total pts`,
+                timestamp: Date.now()
+            });
+
+            io.to(room.id).emit('chatMessage', room.messages[room.messages.length - 1]);
+
+            // Update all other players' games played count
+            room.players.forEach((p, pid) => {
+                if (pid !== socket.id) {
+                    const pStats = userStats.get(p.name);
+                    pStats.gamesPlayed++;
+                }
+            });
+
             io.to(room.id).emit('gameFinished', {
                 winner: {
                     id: socket.id,
@@ -221,6 +290,40 @@ io.on('connection', (socket) => {
         room.winner = null;
 
         io.to(room.id).emit('roomUpdate', serializeRoom(room));
+    });
+
+    // Chat message
+    socket.on('chatMessage', ({ message }) => {
+        const playerData = players.get(socket.id);
+        if (!playerData) return;
+
+        const room = rooms.get(playerData.roomId);
+        if (!room) return;
+
+        // Get player or spectator name
+        let senderName = 'Unknown';
+        if (playerData.role === 'player') {
+            const player = room.players.get(socket.id);
+            if (player) senderName = player.name;
+        } else {
+            senderName = 'Spectator';
+        }
+
+        const chatMsg = {
+            type: 'user',
+            sender: senderName,
+            text: message,
+            timestamp: Date.now()
+        };
+
+        room.messages.push(chatMsg);
+
+        // Keep only last 100 messages
+        if (room.messages.length > 100) {
+            room.messages.shift();
+        }
+
+        io.to(room.id).emit('chatMessage', chatMsg);
     });
 
     // Leave room
@@ -300,7 +403,8 @@ function serializeRoom(room) {
         spectatorCount: room.spectators.size,
         gameState: room.gameState,
         currentNumber: room.currentNumber,
-        winner: room.winner ? room.players.get(room.winner) : null
+        winner: room.winner ? room.players.get(room.winner) : null,
+        messages: room.messages || []
     };
 }
 
