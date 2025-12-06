@@ -1,5 +1,21 @@
 import express from 'express';
 import { createServer } from 'http';
+import { Server } from 'socket.io';
+import cors from 'cors';
+
+const app = express();
+const httpServer = createServer(app);
+const io = new Server(httpServer, {
+    cors: {
+        origin: ["http://localhost:3000", "https://reflefek.vercel.app", "https://reflefek-hzkt02zme-ercan-yarmacis-projects.vercel.app"],
+        methods: ["GET", "POST"],
+        credentials: true
+    }
+});
+
+app.use(cors());
+app.use(express.json());
+
 // Game state
 const rooms = new Map(); // roomId -> room data
 const players = new Map(); // socketId -> player data
