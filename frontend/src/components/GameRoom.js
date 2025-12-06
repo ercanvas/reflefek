@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import Chat from './Chat';
 import './click-counter.css';
+import './chat-layout.css';
 
 function GameRoom({ socket, roomId, roomData, playerName, onLeaveRoom }) {
     const [currentNumber, setCurrentNumber] = useState(null);
@@ -128,105 +130,115 @@ function GameRoom({ socket, roomId, roomData, playerName, onLeaveRoom }) {
                 </button>
             </div>
 
-            <div className="game-container">
-                {/* Scoreboard */}
-                <div className="scoreboard">
-                    <h3 className="scoreboard-title">Skor Tablosu</h3>
-                    <div className="player-list">
-                        {localRoomData.players.map((player) => (
-                            <div
-                                key={player.id}
-                                className={`player-item ${player.id === socket.id ? 'current-player' : ''}`}
-                            >
-                                <span className="player-name">
-                                    {player.name} {player.id === socket.id ? '(Sen)' : ''}
-                                </span>
-                                <span className="player-score">{player.score}/10</span>
-                                {localRoomData.gameState === 'waiting' && (
-                                    <span className={`ready-indicator ${player.ready ? 'ready' : ''}`}>
-                                        {player.ready ? '✓' : '○'}
+            <div className="game-container-with-chat">
+                <div className="game-container">
+                    {/* Scoreboard */}
+                    <div className="scoreboard">
+                        <h3 className="scoreboard-title">Skor Tablosu</h3>
+                        <div className="player-list">
+                            {localRoomData.players.map((player) => (
+                                <div
+                                    key={player.id}
+                                    className={`player-item ${player.id === socket.id ? 'current-player' : ''}`}
+                                >
+                                    <span className="player-name">
+                                        {player.name} {player.id === socket.id ? '(Sen)' : ''}
+                                        {player.totalPoints > 0 && (
+                                            <span className="total-points-badge">{player.totalPoints} pts</span>
+                                        )}
                                     </span>
+                                    <span className="player-score">{player.score}/10</span>
+                                    {localRoomData.gameState === 'waiting' && (
+                                        <span className={`ready-indicator ${player.ready ? 'ready' : ''}`}>
+                                            {player.ready ? '✓' : '○'}
+                                        </span>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Game Area */}
+                    <div className="game-area">
+                        {localRoomData.gameState === 'waiting' && (
+                            <div className="waiting-screen">
+                                <h2>Oyuncular Bekleniyor...</h2>
+                                <p>En az 2 oyuncu gerekli</p>
+                                {!isReady && canStart && (
+                                    <button className="btn btn-primary btn-large" onClick={handleReady}>
+                                        Hazırım!
+                                    </button>
+                                )}
+                                {isReady && (
+                                    <p className="status-text">Diğer oyuncular bekleniyor...</p>
                                 )}
                             </div>
-                        ))}
+                        )}
+
+                        {countdown !== null && (
+                            <div className="countdown-screen">
+                                <h1 className="countdown-number">{countdown}</h1>
+                                <p>Oyun başlıyor...</p>
+                            </div>
+                        )}
+
+                        {localRoomData.gameState === 'playing' && (
+                            <div className="play-screen">
+                                {waiting && !currentNumber && (
+                                    <div className="waiting-number">
+                                        <div className="spinner"></div>
+                                        <p>Sayı gösterilmeyi bekliyor...</p>
+                                    </div>
+                                )}
+
+                                {currentNumber !== null && (
+                                    <div className="number-display">
+                                        <div className="click-counter">
+                                            <span className="counter-text">{clickCount} / {currentNumber}</span>
+                                            <span className="remaining-text">{remainingClicks} tıklama kaldı</span>
+                                        </div>
+                                        <div className="number-circle" onClick={handleClick}>
+                                            {currentNumber}
+                                        </div>
+                                        <p className="click-instruction">
+                                            {currentNumber} KERE TIKLA!
+                                        </p>
+                                    </div>
+                                )}
+
+                                {flashMessage && (
+                                    <div className="flash-message">
+                                        {flashMessage}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {localRoomData.gameState === 'finished' && (
+                            <div className="finished-screen">
+                                <h1 className="winner-announce">
+                                    {localRoomData.winner?.name} KAZANDI! 🏆
+                                </h1>
+                                <div className="final-scores">
+                                    <h3>Final Skorları:</h3>
+                                    {localRoomData.players.map((player) => (
+                                        <div key={player.id} className="final-score-item">
+                                            <span>{player.name}</span>
+                                            <span>{player.score} puan</span>
+                                        </div>
+                                    ))}
+                                </div>
+                                <button className="btn btn-primary btn-large" onClick={handleRestart}>
+                                    Yeniden Oyna
+                                </button>
+                            </div>
+                        )}
                     </div>
                 </div>
 
-                {/* Game Area */}
-                <div className="game-area">
-                    {localRoomData.gameState === 'waiting' && (
-                        <div className="waiting-screen">
-                            <h2>Oyuncular Bekleniyor...</h2>
-                            <p>En az 2 oyuncu gerekli</p>
-                            {!isReady && canStart && (
-                                <button className="btn btn-primary btn-large" onClick={handleReady}>
-                                    Hazırım!
-                                </button>
-                            )}
-                            {isReady && (
-                                <p className="status-text">Diğer oyuncular bekleniyor...</p>
-                            )}
-                        </div>
-                    )}
-
-                    {countdown !== null && (
-                        <div className="countdown-screen">
-                            <h1 className="countdown-number">{countdown}</h1>
-                            <p>Oyun başlıyor...</p>
-                        </div>
-                    )}
-
-                    {localRoomData.gameState === 'playing' && (
-                        <div className="play-screen">
-                            {waiting && !currentNumber && (
-                                <div className="waiting-number">
-                                    <div className="spinner"></div>
-                                    <p>Sayı gösterilmeyi bekliyor...</p>
-                                </div>
-                            )}
-
-                            {currentNumber !== null && (
-                                <div className="number-display">
-                                    <div className="click-counter">
-                                        <span className="counter-text">{clickCount} / {currentNumber}</span>
-                                        <span className="remaining-text">{remainingClicks} tıklama kaldı</span>
-                                    </div>
-                                    <div className="number-circle" onClick={handleClick}>
-                                        {currentNumber}
-                                    </div>
-                                    <p className="click-instruction">
-                                        {currentNumber} KERE TIKLA!
-                                    </p>
-                                </div>
-                            )}
-
-                            {flashMessage && (
-                                <div className="flash-message">
-                                    {flashMessage}
-                                </div>
-                            )}
-                        </div>
-                    )}
-
-                    {localRoomData.gameState === 'finished' && (
-                        <div className="finished-screen">
-                            <h1 className="winner-announce">
-                                {localRoomData.winner?.name} KAZANDI! 🏆
-                            </h1>
-                            <div className="final-scores">
-                                <h3>Final Skorları:</h3>
-                                {localRoomData.players.map((player) => (
-                                    <div key={player.id} className="final-score-item">
-                                        <span>{player.name}</span>
-                                        <span>{player.score} puan</span>
-                                    </div>
-                                ))}
-                            </div>
-                            <button className="btn btn-primary btn-large" onClick={handleRestart}>
-                                Yeniden Oyna
-                            </button>
-                        </div>
-                    )}
+                {/* Chat */}
+                <div className="chat-sidebar">
+                    <Chat socket={socket} roomData={localRoomData} />
                 </div>
             </div>
         </div>

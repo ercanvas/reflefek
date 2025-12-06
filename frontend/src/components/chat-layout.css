@@ -1,0 +1,42 @@
+/* Chat and layout styling */
+.game-container-with-chat,
+.spectator-content-with-chat {
+    display: grid;
+    grid-template-columns: 1fr 350px;
+    gap: 1.5rem;
+    height: calc(100vh - 120px);
+}
+
+.spectator-main {
+    overflow-y: auto;
+}
+
+.chat-sidebar {
+    height: 100%;
+    overflow: hidden;
+}
+
+.total-points-badge {
+    display: inline-block;
+    margin-left: 0.5rem;
+    padding: 0.25rem 0.5rem;
+    background: linear-gradient(135deg, hsl(142, 76%, 36%), hsl(142, 76%, 46%));
+    color: white;
+    font-size: 0.75rem;
+    font-weight: 700;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+}
+
+@media (max-width: 1024px) {
+
+    .game-container-with-chat,
+    .spectator-content-with-chat {
+        grid-template-columns: 1fr;
+        grid-template-rows: 1fr auto;
+    }
+
+    .chat-sidebar {
+        height: 300px;
+    }
+}
